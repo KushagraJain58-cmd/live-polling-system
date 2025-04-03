@@ -19,7 +19,9 @@ let activePoll = null
 let pollResults = {}
 const pollHistory = []
 let students = []
+const studentVotes = new Set() // Track which students have voted
 let pollIdCounter = 1
+let pollTimer = null
 
 // Socket.io connection handler
 io.on("connection", (socket) => {
@@ -35,6 +37,7 @@ io.on("connection", (socket) => {
         ...activePoll,
         results: pollResults,
         totalVotes: Object.values(pollResults).reduce((sum, count) => sum + count, 0),
+        totalStudents: students.length,
       })
     }
   })
@@ -46,6 +49,7 @@ io.on("connection", (socket) => {
         ...activePoll,
         results: pollResults,
         totalVotes: Object.values(pollResults).reduce((sum, count) => sum + count, 0),
+        totalStudents: students.length,
       })
     }
   })
@@ -57,14 +61,20 @@ io.on("connection", (socket) => {
         ...pollData,
         id: pollIdCounter++,
         createdAt: new Date().toISOString(),
+        totalStudents: students.length,
       }
       pollResults = {}
+      studentVotes.clear() // Reset student votes tracking
 
       // Notify all students about the new poll
       io.to("students").emit("student:new-poll", activePoll)
 
       // Set a timer to automatically end the poll
-      setTimeout(() => {
+      if (pollTimer) {
+        clearTimeout(pollTimer)
+      }
+
+      pollTimer = setTimeout(() => {
         if (activePoll && activePoll.id === pollData.id) {
           endPoll()
         }
@@ -86,6 +96,19 @@ io.on("connection", (socket) => {
     // Remove student from the list
     students = students.filter((s) => s.id !== studentId)
     io.to("teachers").emit("teacher:students-update", students)
+
+    // Update active poll with new student count
+    if (activePoll) {
+      activePoll.totalStudents = students.length
+
+      // Send updated response counts to all students
+      broadcastResponseCounts()
+
+      // Check if all remaining students have voted
+      if (students.length > 0 && studentVotes.size >= students.length) {
+        endPoll()
+      }
+    }
   })
 
   // Student handlers
@@ -104,8 +127,14 @@ io.on("connection", (socket) => {
     // Notify teachers about the new student
     io.to("teachers").emit("teacher:students-update", students)
 
-    // Send current poll to the student if exists
+    // Update active poll with new student count
     if (activePoll) {
+      activePoll.totalStudents = students.length
+
+      // Send updated response counts to all students
+      broadcastResponseCounts()
+
+      // Send current poll to the student
       socket.emit("student:new-poll", activePoll)
     }
   })
@@ -113,6 +142,12 @@ io.on("connection", (socket) => {
   socket.on("student:get-state", () => {
     if (activePoll) {
       socket.emit("student:new-poll", activePoll)
+
+      // Send current response counts
+      socket.emit("student:response-update", {
+        responseCount: studentVotes.size,
+        totalStudents: students.length,
+      })
     }
   })
 
@@ -122,22 +157,22 @@ io.on("connection", (socket) => {
       // Update poll results
       pollResults[optionIndex] = (pollResults[optionIndex] || 0) + 1
 
+      // Track that this student has voted
+      studentVotes.add(socket.id)
+
       // Send updated results to teachers
       io.to("teachers").emit("teacher:poll-results", {
         ...activePoll,
         results: pollResults,
         totalVotes: Object.values(pollResults).reduce((sum, count) => sum + count, 0),
+        totalStudents: students.length,
       })
 
-      // Send results to the student who submitted
-      socket.emit("student:poll-results", {
-        ...activePoll,
-        results: pollResults,
-      })
+      // Broadcast updated response counts to all students
+      broadcastResponseCounts()
 
       // Check if all students have answered
-      const totalVotes = Object.values(pollResults).reduce((sum, count) => sum + count, 0)
-      if (totalVotes >= students.length) {
+      if (students.length > 0 && studentVotes.size >= students.length) {
         // End the poll if all students have answered
         endPoll()
       }
@@ -145,11 +180,12 @@ io.on("connection", (socket) => {
   })
 
   socket.on("student:request-results", () => {
-    if (activePoll) {
-      socket.emit("student:poll-results", {
-        ...activePoll,
-        results: pollResults,
-      })
+    // Only send results if poll has ended or all students have voted
+    if (!activePoll) {
+      const lastPoll = pollHistory[0]
+      if (lastPoll) {
+        socket.emit("student:poll-results", lastPoll)
+      }
     }
   })
 
@@ -162,16 +198,47 @@ io.on("connection", (socket) => {
     if (studentIndex !== -1) {
       students.splice(studentIndex, 1)
       io.to("teachers").emit("teacher:students-update", students)
+
+      // Remove from voted set if they had voted
+      studentVotes.delete(socket.id)
+
+      // Update active poll with new student count
+      if (activePoll) {
+        activePoll.totalStudents = students.length
+
+        // Send updated response counts to all students
+        broadcastResponseCounts()
+
+        // Check if all remaining students have voted
+        if (students.length > 0 && studentVotes.size >= students.length) {
+          endPoll()
+        }
+      }
     }
   })
 })
 
+// Helper function to broadcast response counts to all students
+function broadcastResponseCounts() {
+  io.to("students").emit("student:response-update", {
+    responseCount: studentVotes.size,
+    totalStudents: students.length,
+  })
+}
+
 // Helper function to end the current poll
 function endPoll() {
   if (activePoll) {
+    // Clear the timer if it's still running
+    if (pollTimer) {
+      clearTimeout(pollTimer)
+      pollTimer = null
+    }
+
     const finalPoll = {
       ...activePoll,
       results: pollResults,
+      totalStudents: students.length,
       endedAt: new Date().toISOString(),
     }
 
@@ -181,12 +248,13 @@ function endPoll() {
     // Notify teachers
     io.to("teachers").emit("teacher:poll-ended", finalPoll)
 
-    // Notify students
-    io.to("students").emit("student:poll-ended")
+    // Notify students with results
+    io.to("students").emit("student:poll-results", finalPoll)
 
     // Reset active poll
     activePoll = null
     pollResults = {}
+    studentVotes.clear()
   }
 }
 

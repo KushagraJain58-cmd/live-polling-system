@@ -32,16 +32,24 @@ export default function PollHistory({ polls }) {
 
                   return (
                     <div key={optionIndex} className="relative">
-                      <div className="flex items-center mb-1">
-                        <div
-                          className={`flex items-center justify-center w-8 h-8 mr-2 text-white rounded-full ${
-                            isCorrect ? "bg-green-600" : "bg-purple-600"
-                          }`}
-                        >
-                          {optionIndex + 1}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center">
+                          <div
+                            className={`flex items-center justify-center w-8 h-8 mr-2 text-white rounded-full ${
+                              isCorrect ? "bg-green-600" : "bg-purple-600"
+                            }`}
+                          >
+                            {optionIndex + 1}
+                          </div>
+                          <span>{option}</span>
+                          {isCorrect && (
+                            <span className="ml-2 text-sm font-medium text-green-600">(Correct Answer)</span>
+                          )}
                         </div>
-                        <span>{option}</span>
-                        {isCorrect && <span className="ml-2 text-sm font-medium text-green-600">(Correct Answer)</span>}
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-600">{votes} votes</span>
+                          <span className="font-bold">{percentage}%</span>
+                        </div>
                       </div>
 
                       <div className="w-full h-12 overflow-hidden bg-gray-200 rounded-lg">
@@ -58,6 +66,12 @@ export default function PollHistory({ polls }) {
                     </div>
                   )
                 })}
+              </div>
+
+              <div className="mt-4 text-center">
+                <p className="text-gray-600">
+                  Total responses: {totalVotes} {poll.totalStudents ? `of ${poll.totalStudents} students` : ""}
+                </p>
               </div>
             </div>
           )

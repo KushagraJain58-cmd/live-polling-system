@@ -20,6 +20,8 @@ export default function StudentView({ username }) {
   const [timeLeft, setTimeLeft] = useState(0)
   const [pollResults, setPollResults] = useState(null)
   const [showResults, setShowResults] = useState(false)
+  const [responseCount, setResponseCount] = useState(0)
+  const [totalStudents, setTotalStudents] = useState(0)
   const socketRef = useRef(null)
 
   useEffect(() => {
@@ -35,6 +37,7 @@ export default function StudentView({ username }) {
         setTimeLeft(pollData.timeLimit)
         setPollResults(null)
         setShowResults(false)
+        setResponseCount(0)
       })
 
       // Listen for poll results
@@ -46,6 +49,12 @@ export default function StudentView({ username }) {
       // Listen for poll ended
       socket.on("student:poll-ended", () => {
         setShowResults(true)
+      })
+
+      // Listen for response count updates
+      socket.on("student:response-update", ({ responseCount, totalStudents }) => {
+        setResponseCount(responseCount)
+        setTotalStudents(totalStudents)
       })
 
       // Listen for kick event
@@ -61,6 +70,7 @@ export default function StudentView({ username }) {
         socket.off("student:new-poll")
         socket.off("student:poll-results")
         socket.off("student:poll-ended")
+        socket.off("student:response-update")
         socket.off("student:kicked")
       }
     }
@@ -133,10 +143,15 @@ export default function StudentView({ username }) {
           />
         )}
 
-        {hasVoted && !showResults && <WaitingForResults />}
+        {hasVoted && !showResults && <WaitingForResults responseCount={responseCount} totalStudents={totalStudents} />}
 
         {showResults && (pollResults || activePoll) && (
-          <PollResults poll={pollResults || activePoll} selectedOption={selectedOption} />
+          <PollResults
+            poll={pollResults || activePoll}
+            selectedOption={selectedOption}
+            responseCount={responseCount}
+            totalStudents={totalStudents}
+          />
         )}
       </main>
     </div>

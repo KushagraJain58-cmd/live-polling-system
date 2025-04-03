@@ -1,9 +1,8 @@
 import { CheckCircle, XCircle } from "lucide-react"
 
-export default function PollResults({ poll, selectedOption }) {
+export default function PollResults({ poll, selectedOption, responseCount, totalStudents }) {
   if (!poll) return null
 
-  
   const totalVotes = Object.values(poll.results || {}).reduce((sum, count) => sum + count, 0)
   const userAnsweredCorrectly = selectedOption === poll.correctOption
 
@@ -25,13 +24,12 @@ export default function PollResults({ poll, selectedOption }) {
             {userAnsweredCorrectly ? (
               <>
                 <CheckCircle size={20} className="mr-2" />
-                <span>Your answer is correct! <br/>  Kindly wait for the next question</span>
-        
+                <span>Your answer is correct!</span>
               </>
             ) : (
               <>
                 <XCircle size={20} className="mr-2" />
-                  <span>Your answer is incorrect. The correct answer is: {poll.options[poll.correctOption]} <br/>  Kindly wait for the next question</span>
+                <span>Your answer is incorrect. The correct answer is: {poll.options[poll.correctOption]}</span>
               </>
             )}
           </div>
@@ -47,17 +45,20 @@ export default function PollResults({ poll, selectedOption }) {
 
           return (
             <div key={index} className="relative">
-              <div className="flex items-center mb-1">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 mr-2 rounded-full text-white ${
-                    isCorrect ? "bg-green-600" : isSelected ? "bg-purple-600" : "bg-gray-500"
-                  }`}
-                >
-                  {index + 1}
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 mr-2 rounded-full text-white ${
+                      isCorrect ? "bg-green-600" : isSelected ? "bg-purple-600" : "bg-gray-500"
+                    }`}
+                  >
+                    {index + 1}
+                  </div>
+                  <span className={`${isCorrect ? "font-bold" : ""}`}>{option}</span>
+                  {isSelected && <span className="ml-2 text-xs font-medium text-purple-600">(Your answer)</span>}
+                  {isCorrect && <span className="ml-2 text-xs font-medium text-green-600">(Correct answer)</span>}
                 </div>
-                <span className={`${isCorrect ? "font-bold" : ""}`}>{option}</span>
-                {isSelected && <span className="ml-2 text-xs font-medium text-purple-600">(Your answer)</span>}
-                {isCorrect && <span className="ml-2 text-xs font-medium text-green-600">(Correct answer)</span>}
+                <span className="font-bold">{percentage}%</span>
               </div>
 
               <div className="w-full h-12 overflow-hidden bg-gray-200 rounded-lg">
@@ -67,9 +68,8 @@ export default function PollResults({ poll, selectedOption }) {
                   }`}
                   style={{ width: `${percentage}%` }}
                 >
-                  <div className="flex items-center justify-between h-full px-4">
+                  <div className="flex items-center h-full px-4">
                     <span className="font-medium text-white">{option}</span>
-                    <span className="font-bold text-white">{percentage}%</span>
                   </div>
                 </div>
               </div>
@@ -78,10 +78,10 @@ export default function PollResults({ poll, selectedOption }) {
         })}
       </div>
 
-      <div className="mt-6 text-center">
-        <p className="text-gray-600">
-          {totalVotes} {totalVotes === 1 ? "response" : "responses"} received
-        </p>
+      <div className="flex items-center justify-center mt-6 space-x-2">
+        <div className="px-4 py-2 text-sm font-medium text-purple-700 bg-purple-100 rounded-full">
+          {responseCount} of {totalStudents} students responded
+        </div>
       </div>
     </div>
   )
